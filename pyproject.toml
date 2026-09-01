@@ -26,7 +26,7 @@ classifiers = [
 correlation = ['pandas>=2.0', 'numpy>=1.24']
 
 [project.urls]
-repository = 'https://github.com/rocky-d/wqb'
+repository = 'https://github.com/sheyi-ls/wqb'
 
 [tool.setuptools.packages.find]
 include = ['wqb']
