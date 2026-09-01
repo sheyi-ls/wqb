@@ -1,0 +1,10 @@
+requests
+
+coverage
+flake8
+mypy
+
+build
+setuptools
+twine
+wheel
