@@ -12,7 +12,7 @@ if str(WQB_ROOT) not in sys.path:
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from tools.expr.api import (
+from wqb.tools.expr.api import (
     SlotKind,
     default_expression_analyze,
     default_expression_transform,

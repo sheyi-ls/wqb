@@ -1,6 +1,6 @@
 # wqb 能力清单
 
-> **wqb** = 纯 BRAIN HTTP SDK（入口 ``from wqb.api import ...``）· **tools** = 工具包（入口 ``from tools.<mod>.api import ...``，依赖 wqb，不发 HTTP）  
+> **wqb** = BRAIN HTTP SDK（入口 ``from wqb.api import ...``）· **wqb.tools** = 工具包（入口 ``from wqb.tools.<mod>.api import ...``，不发 HTTP）  
 > **不做：** machine_lib factories、RA daemon、MySQL、DV、IS checks 解析、Super Alpha API  
 > **范围：** 仅列**尚无**的能力；已有能力的增强 / 健壮性 / kernel 迁移不在此列
 

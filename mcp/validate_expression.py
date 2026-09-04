@@ -21,10 +21,7 @@ WQB_ROOT = Path(__file__).resolve().parents[1]
 if str(WQB_ROOT) not in sys.path:
     sys.path.insert(0, str(WQB_ROOT))
 
-from tools.validate_expression import (  # noqa: E402
-    validate_expression,
-    validate_expression_batch,
-)
+from wqb.tools.expr.api import default_expression_validate  # noqa: E402
 
 mcp = MCPServer("local-validate-expression")
 
@@ -85,18 +82,17 @@ def validate_expression_tool(expression: str) -> Dict[str, Any]:
     logger = _get_logger()
     logger.info("validate_expression_tool: start (%d chars)", len(expression))
     session = _get_session()
-    is_valid, errors = validate_expression(
+    result = default_expression_validate.validate_expression(
         expression,
-        csv_path=None,
         check_fields=True,
         session=session,
     )
     logger.info(
         "validate_expression_tool: done is_valid=%s errors=%d",
-        is_valid,
-        len(errors),
+        result.is_valid,
+        len(result.errors),
     )
-    return {"is_valid": is_valid, "errors": errors}
+    return {"is_valid": result.is_valid, "errors": list(result.errors)}
 
 
 @mcp.tool()
@@ -110,21 +106,20 @@ def validate_expression_batch_tool(expressions: List[str]) -> Dict[str, Any]:
     logger = _get_logger()
     logger.info("validate_expression_batch_tool: start count=%d", len(expressions))
     session = _get_session()
-    results = validate_expression_batch(
+    results = default_expression_validate.validate_expression_batch(
         expressions,
-        csv_path=None,
         check_fields=True,
         session=session,
     )
     logger.info(
         "validate_expression_batch_tool: done valid=%d/%d",
-        sum(1 for ok, _ in results if ok),
+        sum(1 for item in results if item.is_valid),
         len(results),
     )
     return {
         "results": [
-            {"is_valid": is_valid, "errors": errors}
-            for is_valid, errors in results
+            {"is_valid": item.is_valid, "errors": list(item.errors)}
+            for item in results
         ]
     }
 

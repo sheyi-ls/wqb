@@ -19,7 +19,7 @@ def require_pandas():
         import pandas as pd  # noqa: F401
     except ImportError as exc:
         raise ImportError(
-            'tools.correlation requires pandas. Install with: pip install pandas'
+            'wqb.tools.correlation requires pandas. Install with: pip install wqb[correlation]'
         ) from exc
 
 

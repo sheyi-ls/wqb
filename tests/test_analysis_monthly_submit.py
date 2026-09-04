@@ -15,8 +15,8 @@ if str(WQB_ROOT) not in sys.path:
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from tools.analysis.api import default_monthly_submit_analysis
-from tools.analysis.impl.core import normalize_alpha_row
+from wqb.tools.analysis.api import default_monthly_submit_analysis
+from wqb.tools.analysis.impl.core import normalize_alpha_row
 
 
 def _alpha(aid: str, region: str, month: str, kind: str = 'REGULAR'):

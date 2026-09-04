@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Offline tests for tools.correlation.pnl_matrix (mock session, no HTTP)."""
+"""Offline tests for wqb.tools.correlation (mock session, no HTTP)."""
 from __future__ import annotations
 
 import json
@@ -14,7 +14,7 @@ if str(WQB_ROOT) not in sys.path:
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from tools.correlation import pnl_corr_matrix, pnl_corr_matrix_json
+from wqb.tools.correlation.api import default_pnl_correlation
 
 
 def _pnl_payload(records):
@@ -60,9 +60,17 @@ def _make_session():
     )
 
 
-def test_pnl_corr_matrix_json():
+def test_corr_matrix_alphas_json():
     session = _make_session()
-    out = pnl_corr_matrix_json(session, ['A1', 'A2', 'BAD'], years=0)
+    result = default_pnl_correlation.corr_matrix_alphas(
+        session, ['A1', 'A2', 'BAD'], years=0
+    )
+    out = {
+        'alpha_ids': list(result.labels),
+        'skipped': list(result.skipped),
+        'observations': result.observations,
+        'matrix': result.matrix.to_dict() if not result.matrix.empty else {},
+    }
     assert out['alpha_ids'] == ['A1', 'A2']
     assert out['skipped'] == ['BAD']
     assert out['observations'] >= 2
@@ -70,15 +78,15 @@ def test_pnl_corr_matrix_json():
     json.dumps(out)  # serializable
 
 
-def test_pnl_corr_matrix_dataframe():
+def test_corr_matrix_alphas_dataframe():
     session = _make_session()
-    corr_df, skipped, obs = pnl_corr_matrix(session, ['A1', 'A2'], years=0)
-    assert skipped == []
-    assert obs >= 2
-    assert abs(float(corr_df.loc['A1', 'A2']) - 1.0) < 1e-6
+    result = default_pnl_correlation.corr_matrix_alphas(session, ['A1', 'A2'], years=0)
+    assert result.skipped == ()
+    assert result.observations >= 2
+    assert abs(float(result.matrix.loc['A1', 'A2']) - 1.0) < 1e-6
 
 
 if __name__ == '__main__':
-    test_pnl_corr_matrix_json()
-    test_pnl_corr_matrix_dataframe()
+    test_corr_matrix_alphas_json()
+    test_corr_matrix_alphas_dataframe()
     print('ok')

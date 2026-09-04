@@ -29,8 +29,7 @@ correlation = ['pandas>=2.0', 'numpy>=1.24']
 repository = 'https://github.com/sheyi-ls/wqb'
 
 [tool.setuptools.packages.find]
-where = ['.']
-include = ['wqb*', 'tools*']
+include = ['wqb*']
 
 [tool.setuptools.dynamic]
 version = { attr = 'wqb.__version__' }
