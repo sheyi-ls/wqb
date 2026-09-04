@@ -1,10 +1,13 @@
 """Alpha API mixin for WQBSession."""
+import asyncio
 import sys
-from collections.abc import Generator, Iterable
+from collections.abc import Coroutine, Generator, Iterable, Sized
 from pathlib import Path
 from typing import Any
 
 from requests import Response
+
+from ..common.async_util import concurrent_await
 
 from ..common.constants import (
     GET,
