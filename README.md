@@ -42,17 +42,125 @@ conda activate wqb-py311
 python -m pip install wqb
 ```
 
+Optional extras (PnL correlation tools need pandas):
+
+```sh
+python -m pip install 'wqb[correlation]'
+```
+
+### Install from a local wheel
+
+Build and install into your virtualenv (non-editable; ships `wqb` + `wqb.tools` under one top-level package):
+
+```sh
+cd wqb
+python -m pip install build
+python -m build
+python -m pip install 'dist/wqb-*.whl[correlation]'
+```
+
+After upgrading source, rebuild the wheel and reinstall:
+
+```sh
+python -m pip install --force-reinstall 'dist/wqb-*.whl[correlation]'
+```
+
 ### Update
 
 ```sh
 python -m pip install wqb --upgrade --extra-index-url https://pypi.org/simple
 ```
 
+## PACKAGE LAYOUT
+
+Single PyPI package **`wqb`**. After install, site-packages contains only:
+
+```
+wqb/
+├── api/          # public SDK entry (import from wqb.api)
+├── tools/        # non-HTTP helpers (import from wqb.tools.<mod>.api)
+├── impl/         # internal — do not import
+└── common/       # internal — do not import
+```
+
+Public imports:
+
+```python
+from wqb.api import WQBSession, FilterRange, build_regular_alpha, ...
+from wqb.tools.expr.api import default_expression_validate, default_expression_analyze
+from wqb.tools.correlation.api import default_pnl_correlation
+from wqb.tools.analysis.api import default_monthly_submit_analysis
+```
+
+Capability checklist: [docs/capability-roadmap.md](docs/capability-roadmap.md).
+
+## VERIFY INSTALLATION
+
+Smoke-test the **installed** wheel against BRAIN (all capabilities except alpha/SPC **submit**):
+
+```sh
+# credentials: BRAIN_EMAIL + BRAIN_PASSWORD, or monorepo conf/config.yaml
+python scripts/test_installed_capabilities.py
+python scripts/test_installed_capabilities.py --skip-simulate   # faster; skips simulate APIs
+```
+
+The script asserts `wqb` is loaded from `site-packages`, not an editable checkout.
+
+## wqb.tools
+
+Non-HTTP helpers shipped inside the same wheel. Each submodule exposes a `default_*` singleton from `wqb.tools.<mod>.api`.
+
+### Expression (`wqb.tools.expr`)
+
+```python
+from wqb.tools.expr.api import (
+    default_expression_validate,
+    default_expression_analyze,
+    default_expression_transform,
+)
+
+# offline syntax / operator validation
+result = default_expression_validate.validate_expression(
+    "rank(close)", check_fields=False
+)
+
+# field check via WQBSession
+result = default_expression_validate.validate_expression(
+    "rank(close)", check_fields=True, session=wqbs
+)
+
+stats = default_expression_analyze.analyze_expression("rank(close)")
+slots = default_expression_transform.extract_window_slots(
+    "ts_zscore(close, 250)"
+)
+```
+
+### PnL correlation (`wqb.tools.correlation`)
+
+Requires `pip install 'wqb[correlation]'` (pandas + numpy).
+
+```python
+from wqb.tools.correlation.api import default_pnl_correlation
+
+corr = default_pnl_correlation.corr_between_alphas(wqbs, "alpha_a", "alpha_b")
+matrix = default_pnl_correlation.corr_matrix_alphas(wqbs, ["a1", "a2", "a3"])
+```
+
+### Analysis (`wqb.tools.analysis`)
+
+```python
+from wqb.tools.analysis.api import default_monthly_submit_analysis
+
+report = default_monthly_submit_analysis.monthly_submit_count_by_region_json(wqbs)
+print(default_monthly_submit_analysis.format_pivot_table(report))
+```
+
 ## USAGE
 
 **PLEASE ALWAYS REMEMBER:**
 
-- Public imports: ``from wqb.api import WQBSession, FilterRange, ...`` (``impl`` / ``common`` are internal).
+- Public SDK imports: ``from wqb.api import WQBSession, FilterRange, ...`` (``impl`` / ``common`` are internal).
+- Public tools imports: ``from wqb.tools.<mod>.api import default_*`` (see [wqb.tools](#wqbtools)).
 - Manual authentication requests *(including the initial one)* are **never needed**. Just imagine using a permanent session that never expires.
 - All **positional arguments** are **required**, and vice versa.
 - All **keyword arguments** are **optional**, and vice versa.

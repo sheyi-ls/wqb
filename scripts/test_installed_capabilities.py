@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
 """
-Smoke-test installed wqb + wqb.tools capabilities (no submission APIs).
+Smoke-test installed wqb + wqb.tools (see docs/capability-roadmap.md).
 
-Uses the wheel/venv install only — does not add the wqb source tree to sys.path.
+Confirms the wheel/venv install under site-packages — never adds the wqb source tree
+to sys.path.
+
+Sections map to capability-roadmap.md:
+  install / helpers / session / catalog / alpha / simulation / spc  → wqb (wqb.api)
+  tools.expr / tools.correlation / tools.analysis                    → wqb.tools.*
 
 Excluded (submission / destructive SPC writes):
-  - WQBSession.submit
-  - create_spc_submission / patch_spc_submission / zero_spc_* / submit_spc_* / deploy_spc
+  WQBSession.submit
+  create_spc_submission / patch_spc_submission / zero_spc_* / submit_spc_* / deploy_spc
 
 Credentials: BRAIN_EMAIL + BRAIN_PASSWORD env vars, or conf/config.yaml in monorepo root.
 
@@ -14,6 +19,7 @@ Usage:
   source .venv/bin/activate
   python wqb/scripts/test_installed_capabilities.py
   python wqb/scripts/test_installed_capabilities.py --skip-simulate
+  WQB_SKIP_SIMULATE=1 python wqb/scripts/test_installed_capabilities.py
 """
 from __future__ import annotations
 
@@ -22,13 +28,12 @@ import asyncio
 import importlib.util
 import json
 import os
-import sys
-import wqb as wqb_pkg
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Callable
 
+import wqb as wqb_pkg
 import yaml
 
 from wqb.api import (
@@ -37,6 +42,7 @@ from wqb.api import (
     WQBSession,
     build_regular_alpha,
     coerce_multi_targets,
+    compact_sample_output,
     discover_submission_markdowns,
     parse_submission_markdown,
     simulation_ref_url,
@@ -74,11 +80,14 @@ class Runner:
     wqbs: WQBSession
     alpha_ids: list[str] = field(default_factory=list)
     pnl_by_alpha: dict[str, dict] = field(default_factory=dict)
-    results: list[tuple[str, str, bool, str]] = field(default_factory=list)
+    results: list[tuple[str, str, bool, str, bool]] = field(default_factory=list)
 
-    def record(self, section: str, name: str, ok: bool, detail: str = "") -> None:
-        self.results.append((section, name, ok, detail))
-        mark = "PASS" if ok else "FAIL"
+    def record(self, section: str, name: str, ok: bool, detail: str = "", *, skipped: bool = False) -> None:
+        self.results.append((section, name, ok, detail, skipped))
+        if skipped:
+            mark = "SKIP"
+        else:
+            mark = "PASS" if ok else "FAIL"
         line = f"[{mark}] {section} :: {name}"
         if detail:
             line += f" — {detail}"
@@ -86,7 +95,7 @@ class Runner:
 
     def run(self, case: Case) -> None:
         if case.skip:
-            self.record(case.section, case.name, True, f"SKIP: {case.skip_reason}")
+            self.record(case.section, case.name, True, case.skip_reason, skipped=True)
             return
         try:
             detail = case.fn() or ""
@@ -119,6 +128,16 @@ class Runner:
 def _installed_wqb_path() -> str:
     spec = importlib.util.find_spec("wqb")
     return spec.origin if spec and spec.origin else "unknown"
+
+
+def _assert_site_packages_install() -> str:
+    origin = _installed_wqb_path()
+    if "site-packages" not in origin.replace("\\", "/"):
+        raise RuntimeError(
+            f"wqb not loaded from site-packages (got {origin}); "
+            "reinstall with: pip install dist/wqb-*.whl[correlation]"
+        )
+    return origin
 
 
 def find_monorepo_root() -> Path | None:
@@ -176,8 +195,15 @@ def build_cases(runner: Runner, *, skip_simulate: bool) -> list[Case]:
     cases.append(
         Case(
             "install",
-            "package_location",
-            lambda: f"version={wqb_pkg.__version__} path={_installed_wqb_path()}",
+            "site_packages_install",
+            lambda: _assert_site_packages_install(),
+        )
+    )
+    cases.append(
+        Case(
+            "install",
+            "package_version",
+            lambda: f"version={wqb_pkg.__version__}",
         )
     )
 
@@ -311,6 +337,11 @@ def build_cases(runner: Runner, *, skip_simulate: bool) -> list[Case]:
                 "session",
                 "post_authentication",
                 lambda: f"status={wqbs.post_authentication(log=None).status_code}",
+            ),
+            Case(
+                "session",
+                "delete_authentication + re-auth",
+                lambda: _test_delete_and_reauth(wqbs),
             ),
         ]
     )
@@ -496,6 +527,18 @@ def build_cases(runner: Runner, *, skip_simulate: bool) -> list[Case]:
                 lambda: _test_parse_spc_md(md),
                 skip=md is None,
                 skip_reason="no SPC markdown in monorepo",
+            ),
+            Case(
+                "spc",
+                "discover_submission_markdowns",
+                lambda: _test_discover_spc_markdowns(),
+                skip=find_monorepo_root() is None,
+                skip_reason="monorepo root not found",
+            ),
+            Case(
+                "spc",
+                "compact_sample_output",
+                lambda: f"len={len(compact_sample_output('{\"US1234567890|ABCD\": 0.1}'))}",
             ),
         ]
     )
@@ -714,6 +757,20 @@ def _test_parse_spc_md(md: Path | None) -> str:
     return f"name={payload['name']!r} keys={sorted(payload.keys())}"
 
 
+def _test_discover_spc_markdowns() -> str:
+    root = find_monorepo_root()
+    assert root is not None
+    spc_dir = root / "competitions/ Systematic Predictions Challenge/submissions_50"
+    files = discover_submission_markdowns(spc_dir) if spc_dir.is_dir() else []
+    return f"count={len(files)}"
+
+
+def _test_delete_and_reauth(wqbs: WQBSession) -> str:
+    deleted = wqbs.delete_authentication(log=None).status_code
+    reauth = wqbs.post_authentication(log=None).status_code
+    return f"delete={deleted} reauth={reauth}"
+
+
 async def _test_simulate(wqbs: WQBSession) -> str:
     target = build_regular_alpha("rank(close)", decay=0)
     resp = await wqbs.simulate(target, log=None)
@@ -774,9 +831,9 @@ def main() -> int:
             print(f"\n== {current_section} ==", flush=True)
         runner.run(case)
 
-    passed = sum(1 for _, _, ok, detail in runner.results if ok and not detail.startswith("SKIP:"))
-    skipped = sum(1 for _, _, _, detail in runner.results if detail.startswith("SKIP:"))
-    failed = sum(1 for _, _, ok, _ in runner.results if not ok)
+    passed = sum(1 for _, _, ok, _, skipped in runner.results if ok and not skipped)
+    skipped = sum(1 for _, _, _, _, skipped in runner.results if skipped)
+    failed = sum(1 for _, _, ok, _, skipped in runner.results if not ok and not skipped)
     print(
         f"\n{passed} passed, {skipped} skipped, {failed} failed "
         f"(total {len(runner.results)})",
