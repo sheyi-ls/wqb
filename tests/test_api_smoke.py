@@ -16,8 +16,7 @@ if str(ROOT) not in sys.path:
 
 import yaml
 
-import wqb
-from wqb import FilterRange, WQBSession
+from wqb.api import FilterRange, WQBSession, build_regular_alpha, wqb_logger
 
 
 def load_credentials() -> tuple[str, str]:
@@ -49,7 +48,7 @@ def load_credentials() -> tuple[str, str]:
 
 def main() -> int:
     email, password = load_credentials()
-    logger = wqb.wqb_logger(name="wqb-api-test")
+    logger = wqb_logger(name="wqb-api-test")
     wqbs = WQBSession((email, password), logger=logger)
 
     results: list[tuple[str, bool, str]] = []
@@ -255,7 +254,7 @@ def main() -> int:
     # --- helpers (non-HTTP) ---
     run(
         "build_regular_alpha",
-        lambda: f"type={wqb.build_regular_alpha('rank(close)').get('type')}",
+        lambda: f"type={build_regular_alpha('rank(close)').get('type')}",
     )
     run(
         "FilterRange",

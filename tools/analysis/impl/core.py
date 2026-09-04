@@ -1,45 +1,25 @@
-"""Monthly submitted alpha counts by region (Brain API dateSubmitted)."""
+"""Internal helpers for monthly submit aggregation."""
 from __future__ import annotations
 
 import time
 from collections import defaultdict
-from collections.abc import Iterable, Iterator, Sequence
+from collections.abc import Iterable, Sequence
 from datetime import datetime
-from typing import Any, Protocol
+from typing import Any
+
+from ..api.monthly_submit import (
+    DEFAULT_REGION_ORDER,
+    AlphaFilterSession,
+)
 
 __all__ = [
-    'AlphaFilterSession',
-    'DEFAULT_REGION_ORDER',
-    'DEFAULT_START_DATE',
     'aggregate_month_region',
     'fetch_submitted_alphas',
     'format_pivot_table',
-    'monthly_submit_count_by_region_json',
+    'parse_submitted_month',
     'print_monthly_submit_report',
     'print_pivot_table',
 ]
-
-DEFAULT_REGION_ORDER = [
-    'USA',
-    'EUR',
-    'GLB',
-    'ASI',
-    'IND',
-    'DEU',
-    'JPN',
-    'CHN',
-    'AMR',
-    'KOR',
-]
-
-DEFAULT_START_DATE = '2025-12-01'
-DEFAULT_PAGE_SIZE = 100
-DEFAULT_MAX_ALPHAS = 50_000
-DEFAULT_REQUEST_DELAY = 0.3
-
-
-class AlphaFilterSession(Protocol):
-    def filter_alphas(self, *args, **kwargs) -> Iterator[Any]: ...
 
 
 def parse_submitted_month(date_submitted: str) -> str | None:
@@ -65,7 +45,7 @@ def _date_submitted_others(start_date: str | None, end_date: str | None) -> list
     return params
 
 
-def _normalize_alpha_row(alpha: dict[str, Any]) -> dict[str, Any]:
+def normalize_alpha_row(alpha: dict[str, Any]) -> dict[str, Any]:
     settings = alpha.get('settings') or {}
     return {
         'id': alpha.get('id'),
@@ -103,7 +83,7 @@ def _fetch_one_type(
         if not batch:
             break
         for alpha in batch:
-            rows.append(_normalize_alpha_row(alpha))
+            rows.append(normalize_alpha_row(alpha))
             if len(rows) >= max_alphas:
                 return rows
         if len(batch) < page_size:
@@ -116,12 +96,12 @@ def _fetch_one_type(
 def fetch_submitted_alphas(
     session: AlphaFilterSession,
     *,
-    start_date: str | None = DEFAULT_START_DATE,
-    end_date: str | None = None,
-    regular_only: bool = False,
-    page_size: int = DEFAULT_PAGE_SIZE,
-    max_alphas: int = DEFAULT_MAX_ALPHAS,
-    request_delay: float = DEFAULT_REQUEST_DELAY,
+    start_date: str | None,
+    end_date: str | None,
+    regular_only: bool,
+    page_size: int,
+    max_alphas: int,
+    request_delay: float,
 ) -> list[dict[str, Any]]:
     """Paginate OS submitted alphas (REGULAR + SUPER by default)."""
     if regular_only:
@@ -237,46 +217,6 @@ def aggregate_month_region(
     }
 
 
-def monthly_submit_count_by_region_json(
-    session: AlphaFilterSession,
-    *,
-    start_date: str | None = DEFAULT_START_DATE,
-    end_date: str | None = None,
-    regular_only: bool = False,
-    page_size: int = DEFAULT_PAGE_SIZE,
-    max_alphas: int = DEFAULT_MAX_ALPHAS,
-    request_delay: float = DEFAULT_REQUEST_DELAY,
-) -> dict[str, Any]:
-    """
-    Fetch OS alphas and return monthly submit counts by region as JSON.
-
-    Mirrors ``kits/monthly_submit_count_by_region.py`` but uses wqb
-    ``session.filter_alphas`` and returns structured JSON instead of printing.
-    """
-    alphas = fetch_submitted_alphas(
-        session,
-        start_date=start_date,
-        end_date=end_date,
-        regular_only=regular_only,
-        page_size=page_size,
-        max_alphas=max_alphas,
-        request_delay=request_delay,
-    )
-    regular_n = sum(1 for a in alphas if a.get('type') == 'REGULAR')
-    super_n = sum(1 for a in alphas if a.get('type') == 'SUPER')
-    agg = aggregate_month_region(alphas)
-
-    return {
-        'start_date': start_date,
-        'end_date': end_date,
-        'regular_only': regular_only,
-        'total_alphas': len(alphas),
-        'regular_count': regular_n,
-        'super_count': super_n,
-        **agg,
-    }
-
-
 def _fmt_count(total: int, sa: int) -> str:
     """Cell text: total count; SA count in parentheses when > 0."""
     if total <= 0:
@@ -301,7 +241,7 @@ def _pivot_to_legacy(result: dict[str, Any]) -> tuple[dict[str, dict[str, int]],
 
 
 def format_pivot_table(result: dict[str, Any]) -> str:
-    """Return kits-style pivot table text from ``monthly_submit_count_by_region_json`` output."""
+    """Return kits-style pivot table text from monthly submit JSON output."""
     months = list(result.get('months') or [])
     regions = list(result.get('regions') or [])
     total, super_cnt = _pivot_to_legacy(result)
@@ -369,7 +309,7 @@ def print_pivot_table(result: dict[str, Any]) -> None:
 
 
 def print_monthly_submit_report(result: dict[str, Any]) -> None:
-    """Print summary line + pivot table (like ``kits/monthly_submit_count_by_region.py``)."""
+    """Print summary line + pivot table."""
     regular_n = int(result.get('regular_count') or 0)
     super_n = int(result.get('super_count') or 0)
     total_n = int(result.get('total_alphas') or 0)

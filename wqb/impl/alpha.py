@@ -520,7 +520,7 @@ class AlphaMixin:
         """
         Local PPAC check: max correlation vs Power Pool OS alphas only.
 
-        See ``wqb.impl.correlation.ppac_check`` for details.
+        See ``impl.correlation.ppac_check`` for details.
         """
         from pathlib import Path as _Path
 

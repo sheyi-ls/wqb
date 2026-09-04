@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Offline tests for tools.analysis.monthly_submit_by_region."""
+"""Offline tests for tools.analysis (no HTTP)."""
 from __future__ import annotations
 
 import json
@@ -15,8 +15,8 @@ if str(WQB_ROOT) not in sys.path:
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from tools.analysis import aggregate_month_region, monthly_submit_count_by_region_json
-from tools.analysis.monthly_submit_by_region import _normalize_alpha_row as _normalize_row
+from tools.analysis.api import default_monthly_submit_analysis
+from tools.analysis.impl.core import normalize_alpha_row
 
 
 def _alpha(aid: str, region: str, month: str, kind: str = 'REGULAR'):
@@ -30,11 +30,11 @@ def _alpha(aid: str, region: str, month: str, kind: str = 'REGULAR'):
 
 def test_aggregate_month_region():
     alphas = [
-        _normalize_row(_alpha('a1', 'USA', '2025-12')),
-        _normalize_row(_alpha('a2', 'USA', '2025-12', 'SUPER')),
-        _normalize_row(_alpha('a3', 'EUR', '2026-01')),
+        normalize_alpha_row(_alpha('a1', 'USA', '2025-12')),
+        normalize_alpha_row(_alpha('a2', 'USA', '2025-12', 'SUPER')),
+        normalize_alpha_row(_alpha('a3', 'EUR', '2026-01')),
     ]
-    out = aggregate_month_region(alphas)
+    out = default_monthly_submit_analysis.aggregate_month_region(alphas)
     assert out['months'] == ['2025-12', '2026-01']
     assert out['regions'] == ['USA', 'EUR']
     assert out['pivot']['2025-12']['USA']['count'] == 2
@@ -66,7 +66,7 @@ def test_monthly_submit_count_by_region_json():
             'SUPER': [[_alpha('s1', 'USA', '2025-12', 'SUPER')]],
         }
     )
-    out = monthly_submit_count_by_region_json(
+    out = default_monthly_submit_analysis.monthly_submit_count_by_region_json(
         session,
         start_date='2025-12-01',
         request_delay=0,

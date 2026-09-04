@@ -52,6 +52,7 @@ python -m pip install wqb --upgrade --extra-index-url https://pypi.org/simple
 
 **PLEASE ALWAYS REMEMBER:**
 
+- Public imports: ``from wqb.api import WQBSession, FilterRange, ...`` (``impl`` / ``common`` are internal).
 - Manual authentication requests *(including the initial one)* are **never needed**. Just imagine using a permanent session that never expires.
 - All **positional arguments** are **required**, and vice versa.
 - All **keyword arguments** are **optional**, and vice versa.
@@ -76,11 +77,11 @@ python -m pip install wqb --upgrade --extra-index-url https://pypi.org/simple
 ### Create a `logging.Logger` object *(Optional but Recommended)*
 
 ```python
-import wqb
+from wqb.api import print, wqb_logger
 
 # Create `logger`
-logger = wqb.wqb_logger()
-wqb.print(f"{logger.name = }")  # print(f"{logger.name = }", flush=True)
+logger = wqb_logger()
+print(f"{logger.name = }")  # print(f"{logger.name = }", flush=True)
 
 # Manual logging
 # logger.info('This is an info for testing.')
@@ -90,7 +91,7 @@ wqb.print(f"{logger.name = }")  # print(f"{logger.name = }", flush=True)
 ### Create a `wqb.WQBSession` object
 
 ```python
-from wqb import WQBSession, print
+from wqb.api import WQBSession, print
 
 # Create `wqbs`
 wqbs = WQBSession(('<email>', '<password>'), logger=logger)
@@ -138,7 +139,7 @@ resp = wqbs.locate_dataset(dataset_id)
 #### `wqb.WQBSession.search_datasets_limited(...)`
 
 ```python
-from wqb import FilterRange
+from wqb.api import FilterRange
 
 region = '<region>'  # 'USA'
 delay = 1  # 1, 0
@@ -165,7 +166,7 @@ resp = wqbs.search_datasets_limited(
 #### `wqb.WQBSession.search_datasets(...)`
 
 ```python
-from wqb import FilterRange
+from wqb.api import FilterRange
 
 region = '<region>'  # 'USA'
 delay = 1  # 1, 0
@@ -204,7 +205,7 @@ resp = wqbs.locate_field(field_id)
 #### `wqb.WQBSession.search_fields_limited(...)`
 
 ```python
-from wqb import FilterRange
+from wqb.api import FilterRange
 
 region = '<region>'  # 'USA'
 delay = 1  # 1, 0
@@ -232,7 +233,7 @@ resp = wqbs.search_fields_limited(
 #### `wqb.WQBSession.search_fields(...)`
 
 ```python
-from wqb import FilterRange
+from wqb.api import FilterRange
 
 region = '<region>'  # 'USA'
 delay = 1  # 1, 0
@@ -273,7 +274,7 @@ resp = wqbs.locate_alpha(alpha_id)
 
 ```python
 from datetime import datetime
-from wqb import FilterRange
+from wqb.api import FilterRange
 
 lo = datetime.fromisoformat('2025-01-28T00:00:00-05:00')
 hi = datetime.fromisoformat('2025-01-29T00:00:00-05:00')
@@ -296,7 +297,7 @@ alpha_ids = [item['id'] for item in resp.json()['results']]
 
 ```python
 from datetime import datetime
-from wqb import FilterRange
+from wqb.api import FilterRange
 
 lo = datetime.fromisoformat('2025-01-28T00:00:00-05:00')
 hi = datetime.fromisoformat('2025-01-29T00:00:00-05:00')
@@ -320,7 +321,7 @@ for resp in resps:
 #### `wqb.WQBSession.patch_properties(...)`
 
 ```python
-from wqb import NULL
+from wqb.api import NULL
 
 # `None` means not to set the property
 # `wqb.NULL` means to set the property as `null` (JSON)
@@ -383,10 +384,10 @@ resp = asyncio.run(
 
 ```python
 import asyncio
-import wqb
+from wqb.api import to_multi_alphas
 
 alphas = [{...}, {...}, {...}]  # [<alpha_0>, <alpha_1>, <alpha_2>]
-multi_alphas = wqb.to_multi_alphas(alphas, 10)
+multi_alphas = to_multi_alphas(alphas, 10)
 concurrency = 8  # 1 <= concurrency <= 10
 resps = asyncio.run(
     wqbs.concurrent_simulate(

@@ -35,9 +35,9 @@ _logger: logging.Logger | None = None
 def _get_logger() -> logging.Logger:
     global _logger
     if _logger is None:
-        import wqb
+        from wqb.api import wqb_logger
 
-        _logger = wqb.wqb_logger(name="wqb-mcp")
+        _logger = wqb_logger(name="wqb-mcp")
     return _logger
 
 
@@ -64,11 +64,11 @@ def _get_session():
         raise ValueError(
             "字段校验需要 BRAIN 凭证，请设置 BRAIN_EMAIL 与 BRAIN_PASSWORD 环境变量"
         )
-    import wqb
+    from wqb.api import WQBSession
 
     logger = _get_logger()
     logger.info("MCP validate_expression: creating WQBSession")
-    _session = wqb.WQBSession(creds, logger=logger)
+    _session = WQBSession(creds, logger=logger)
     _session.auth_request(log="")
     logger.info("MCP validate_expression: auth_request complete")
     return _session

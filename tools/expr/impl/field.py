@@ -1,21 +1,18 @@
-"""Resolve datafield types via wqb ``locate_field`` (no CSV)."""
+"""Field lookup and semantic-analysis context."""
 from __future__ import annotations
 
-from typing import Any, Protocol
+from typing import Any
 
-from .builtin import (
+from ..api.validate import BrainFieldSession
+from .core import (
     builtin_field_info,
     builtin_field_type,
     is_exempt_field,
     normalize_field_id,
 )
-from .parse import ParamType
+from .parse import OperatorSpec, OperatorSpecBuilder, ParamType
 
-__all__ = ['FieldResolver', 'BrainFieldSession']
-
-
-class BrainFieldSession(Protocol):
-    def locate_field(self, field_id: str, *args, **kwargs) -> Any: ...
+__all__ = ['FieldContext', 'FieldResolver']
 
 
 def _param_type_from_brain(type_str: str | None) -> ParamType | None:
@@ -26,6 +23,13 @@ def _param_type_from_brain(type_str: str | None) -> ParamType | None:
         return ParamType[key]
     except KeyError:
         return None
+
+
+def _exempt_param_type(name: str) -> ParamType | None:
+    type_name = builtin_field_type(name)
+    if type_name is None:
+        return None
+    return ParamType[type_name]
 
 
 class FieldResolver:
@@ -83,3 +87,43 @@ class FieldResolver:
             return None
         resp.raise_for_status()
         return resp.json()
+
+
+class FieldContext:
+    """Drop-in replacement for ``DataContext`` using ``FieldResolver``."""
+
+    def __init__(
+        self,
+        resolver: FieldResolver | None = None,
+        *,
+        check_fields: bool = True,
+    ) -> None:
+        self.check_fields = check_fields
+        self.resolver = resolver or FieldResolver()
+        self.operators = OperatorSpecBuilder.build_all_specs()
+
+    def is_datafield(self, name: str) -> bool:
+        if is_exempt_field(name):
+            return True
+        if not self.check_fields:
+            return False
+        return self.resolver.is_known_field(name)
+
+    def get_datafield_type(self, name: str) -> ParamType | None:
+        exempt = _exempt_param_type(name)
+        if exempt is not None:
+            return exempt
+        if not self.check_fields:
+            return None
+        return self.resolver.resolve_type(name)
+
+    def is_operator(self, name: str) -> bool:
+        name_lower = name.lower()
+        return any(op.lower() == name_lower for op in self.operators)
+
+    def get_operator_spec(self, name: str) -> OperatorSpec | None:
+        name_lower = name.lower()
+        for op_name, op_spec in self.operators.items():
+            if op_name.lower() == name_lower:
+                return op_spec
+        return None

@@ -1,6 +1,6 @@
 # wqb 能力清单
 
-> **wqb** = 纯 BRAIN HTTP SDK · **tools** = 工具包（依赖 wqb，不发 HTTP）  
+> **wqb** = 纯 BRAIN HTTP SDK（入口 ``from wqb.api import ...``）· **tools** = 工具包（入口 ``from tools.<mod>.api import ...``，依赖 wqb，不发 HTTP）  
 > **不做：** machine_lib factories、RA daemon、MySQL、DV、IS checks 解析、Super Alpha API  
 > **范围：** 仅列**尚无**的能力；已有能力的增强 / 健壮性 / kernel 迁移不在此列
 
@@ -46,22 +46,30 @@
 - [x] `FilterRange` / `DatetimeRange`
 - [x] `wait_get`（Retry-After / 空 body / 401 / 429 重试，recordset 等 GET 共用）
 
-# 七、tools — 表达式（``wqb/tools/expr``，与 ``wqb/wqb`` SDK 包同级）
+# 七、tools — 表达式
 
-- [x] 表达式验证（``validate_expression`` / ``validate_expression_batch`` / ``validate_expression_batch_json``，免查名单 + wqb 字段 API，无 CSV；parse 暂 bridge ``kits/validate_expression``）
-- [x] 唯一算子 / 字段计数（``analyze_expression``）
-- [x] ts 窗口槽位提取 / 回填（``extract_window_slots`` / ``apply_window_values``）
+- [x] 单条表达式校验（`validate_expression`）
+- [x] 批量表达式校验（`validate_expression_batch`）
+- [x] 批量校验 JSON 汇总（`validate_expression_batch_json`）
+- [x] 算子 / 字段统计（`analyze_expression`）
+- [x] 唯一算子计数（`count_unique_operators`）
+- [x] 唯一字段计数（`count_unique_fields`）
+- [x] ts 窗口槽位提取（`extract_window_slots`）
+- [x] ts 窗口回填（`apply_window_values`）
+- [x] AST 还原表达式（`program_to_expression`）
 
-# 八、tools — 相关性 / 检查
+# 八、tools — 相关性
 
-- [x] 候选 PnL 相关矩阵（``tools.correlation.pnl_corr_matrix_json``，PnL 走 wqb ``get_pnl``）
-
+- [x] 两个 alpha 近 N 年 PnL 相关（`corr_between_alphas`）
+- [x] 两份 PnL 近 N 年相关（`corr_between_pnls`）
+- [x] alpha 序列相关矩阵（`corr_matrix_alphas`）
+- [x] PnL 序列相关矩阵（`corr_matrix_pnls`）
 
 # 九、tools — 分析
 
-- [x] 每月各地区提交数量（``tools.analysis.monthly_submit_count_by_region_json``）
+- [x] 每月各地区提交数量（`monthly_submit_count_by_region_json`）
 
 
 ---
 
-*最后更新：2026-09-01*
+*最后更新：2026-09-04*

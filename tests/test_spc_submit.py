@@ -17,8 +17,7 @@ if str(ROOT) not in sys.path:
 import yaml
 from requests import HTTPError
 
-from wqb import WQBSession
-from wqb.common.spc import parse_submission_markdown
+from wqb.api import WQBSession, parse_submission_markdown
 
 
 def load_credentials() -> tuple[str, str]:

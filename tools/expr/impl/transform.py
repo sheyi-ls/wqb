@@ -1,13 +1,14 @@
-"""Extract and apply ts_* time-window literal slots."""
+"""Default ``ExpressionTransformAPI`` implementation."""
 from __future__ import annotations
 
 import json
 import math
-from dataclasses import dataclass
 from enum import Enum
 from typing import Sequence
 
-from ..parse import (
+from ..api.transform import SlotKind, WindowSlot
+from .core import parse_program
+from .parse import (
     ASTNode,
     AssignmentNode,
     BinaryOpNode,
@@ -22,20 +23,10 @@ from ..parse import (
     StringNode,
     UnaryOpNode,
 )
-from ..validate import parse_program
-from . import SlotKind
 
 __all__ = [
-    'SlotKind',
-    'ParamRole',
-    'WindowSlot',
-    'extract_window_slots',
-    'apply_window_values',
-    'program_to_expression',
-    'ast_to_expression',
-    'window_candidates_for_value',
-    'DEFAULT_WINDOW_VALUES',
-    'slots_to_json',
+    'DefaultExpressionTransform',
+    'default_expression_transform',
 ]
 
 PathStep = tuple[str, int | str]
@@ -87,19 +78,6 @@ PARAM_ROLE_MAP = _build_param_role_map()
 
 def param_role(operator: str, param_name: str) -> ParamRole:
     return PARAM_ROLE_MAP.get((operator, param_name), ParamRole.SKIP)
-
-
-@dataclass(frozen=True)
-class WindowSlot:
-    kind: SlotKind
-    slot_id: str
-    path: tuple[PathStep, ...]
-    operator: str
-    param_name: str
-    value: int
-
-    def label(self) -> str:
-        return f'{self.operator}.{self.param_name}'
 
 
 def _path_to_slot_id(path: tuple[PathStep, ...]) -> str:
@@ -194,15 +172,6 @@ def _walk_collect_slots(
         return
 
 
-def extract_window_slots(expression: str) -> list[WindowSlot]:
-    program = parse_program(expression)
-    slots: list[WindowSlot] = []
-    for i, stmt in enumerate(program.statements):
-        _walk_collect_slots(stmt, (('stmt', i),), slots)
-    _walk_collect_slots(program.final_expr, (('final', 0),), slots)
-    return slots
-
-
 def _resolve_path(root: ProgramNode, path: tuple[PathStep, ...]) -> ASTNode:
     if not path:
         raise ValueError('empty path')
@@ -244,37 +213,6 @@ def _resolve_path(root: ProgramNode, path: tuple[PathStep, ...]) -> ASTNode:
             raise ValueError(f'unknown path step: {step}')
         i += 1
     return node
-
-
-def apply_window_values(
-    expression: str,
-    assignments: dict[str, int],
-    *,
-    slots: Sequence[WindowSlot] | None = None,
-) -> str:
-    program = parse_program(expression)
-    slot_list = list(slots) if slots is not None else extract_window_slots(expression)
-    by_id = {s.slot_id: s for s in slot_list}
-    for slot_id, new_val in assignments.items():
-        slot = by_id.get(slot_id)
-        if slot is None:
-            raise KeyError(f'unknown slot_id: {slot_id}')
-        iv = int(new_val)
-        if iv <= 0:
-            raise ValueError(f'window must be positive: {slot_id}={iv}')
-        target = _resolve_path(program, slot.path)
-        if not isinstance(target, NumberNode):
-            raise TypeError(f'slot {slot_id} does not point to NumberNode')
-        target.value = float(iv) if isinstance(target.value, float) else iv
-    return program_to_expression(program)
-
-
-def program_to_expression(program: ProgramNode) -> str:
-    stmts = '; '.join(
-        f'{s.var_name} = {ast_to_expression(s.value)}' for s in program.statements
-    )
-    tail = ast_to_expression(program.final_expr)
-    return f'{stmts}; {tail}' if stmts else tail
 
 
 def ast_to_expression(node: ASTNode) -> str:
@@ -337,3 +275,48 @@ def slots_to_json(slots: Sequence[WindowSlot]) -> str:
         for s in slots
     ]
     return json.dumps(payload, ensure_ascii=False)
+
+
+class DefaultExpressionTransform:
+    """Default implementation of ``ExpressionTransformAPI``."""
+
+    def extract_window_slots(self, expression: str) -> list[WindowSlot]:
+        program = parse_program(expression)
+        slots: list[WindowSlot] = []
+        for i, stmt in enumerate(program.statements):
+            _walk_collect_slots(stmt, (('stmt', i),), slots)
+        _walk_collect_slots(program.final_expr, (('final', 0),), slots)
+        return slots
+
+    def apply_window_values(
+        self,
+        expression: str,
+        assignments: dict[str, int],
+        *,
+        slots: Sequence[WindowSlot] | None = None,
+    ) -> str:
+        program = parse_program(expression)
+        slot_list = list(slots) if slots is not None else self.extract_window_slots(expression)
+        by_id = {s.slot_id: s for s in slot_list}
+        for slot_id, new_val in assignments.items():
+            slot = by_id.get(slot_id)
+            if slot is None:
+                raise KeyError(f'unknown slot_id: {slot_id}')
+            iv = int(new_val)
+            if iv <= 0:
+                raise ValueError(f'window must be positive: {slot_id}={iv}')
+            target = _resolve_path(program, slot.path)
+            if not isinstance(target, NumberNode):
+                raise TypeError(f'slot {slot_id} does not point to NumberNode')
+            target.value = float(iv) if isinstance(target.value, float) else iv
+        return self.program_to_expression(program)
+
+    def program_to_expression(self, program: ProgramNode) -> str:
+        stmts = '; '.join(
+            f'{s.var_name} = {ast_to_expression(s.value)}' for s in program.statements
+        )
+        tail = ast_to_expression(program.final_expr)
+        return f'{stmts}; {tail}' if stmts else tail
+
+
+default_expression_transform = DefaultExpressionTransform()
